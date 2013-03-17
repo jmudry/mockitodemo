@@ -1,6 +1,8 @@
 package com.example.mockitodemo;
 
 import static org.junit.Assert.*;
+
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.internal.verification.AtMost;
 
@@ -9,40 +11,75 @@ import static org.mockito.BDDMockito.*;
 
 public class MessageAppTest {
 
-	/*poprzez Spy*/
-	@Test
-	public void sendMessageTest () {
-		MessageService msSpy = spy(new MessageServiceImpl());
- 	//	willReturn(MessageStatus.CONNECTION_ERROR).given(msSpy).connect(anyString());
- 	//	willReturn(MessageStatus.SENDING_ERROR).given(msSpy).sendMessage(anyString(), anyString());	
- 		willReturn(MessageStatus.SENDING_ERROR).given(msSpy).sendMessage(eq("ksi"), anyString());	
- 		//SUT
- 		MessageApp ma = new MessageApp(msSpy);
- 		
- 		//assertEquals(1, ma.sendMessage("sigma", "ksi", "Nie działa wifi"));
- 		assertEquals(2, ma.sendMessage("sigma", "ksi", "Nie działa wifi"));
- 		assertEquals(0, ma.sendMessage("sigma", "szypulski", "Nie działa wifi"));
- 		
-	}
+	private static final String INVALIDSERWER = "invalidserwer";
+	private static final String INVALIDRECEIPIENT = "invalidreceipient";
+	private static final String VALID_CONTENT = "validContent";
+	private static final String INVALID_CONTENT = "invalidContent";
+	private static final String VALIDRECEIPIENT = "validreceipient";
+	private static final String VALIDSERWER = "validserwer";
+	MessageService msMock;
+	MessageApp ma;
 	
-	@Test
-	public void sendMessageTest2 () {
-		MessageService msMock = mock(MessageService.class);
-	
+	@Before 
+	public void setUp(){
+		msMock = mock(MessageService.class);
 		when(msMock.connect(anyString())).thenReturn(MessageStatus.CONNECTED);
-		when(msMock.connect("sigma")).thenReturn(MessageStatus.CONNECTION_ERROR);
-		
+		when(msMock.connect(INVALIDSERWER)).thenReturn(MessageStatus.CONNECTION_ERROR);
 		when(msMock.sendMessage(anyString(), anyString())).thenReturn(MessageStatus.SEND);
-		when(msMock.sendMessage(eq("ksi"), anyString())).thenReturn(MessageStatus.SENDING_ERROR);
+		when(msMock.sendMessage(eq(INVALIDRECEIPIENT), anyString())).thenReturn(MessageStatus.INVALID_RECEIPIENT);
+		when(msMock.sendMessage(anyString(), eq(INVALID_CONTENT))).thenReturn(MessageStatus.INVALID_CONTENT);
 		
- 		MessageApp ma = new MessageApp(msMock);
- 	
- 		assertEquals(1, ma.sendMessage("sigma", "ktos", "Nie działa wifi"));
- 		assertEquals(2, ma.sendMessage("manta", "ksi", "Nie działa wifi"));
- 		assertEquals(0, ma.sendMessage("delta", "szypulski", "Nie działa wifi"));
- 		verify(msMock,times(2)).sendMessage(anyString(), anyString());
- 		verify(msMock, atMost(3)).connect(anyString());
- 		
+		ma = new MessageApp(msMock);
 	}
+	
+	@Test
+	public void notConnectedSpyTest() {
+		MessageService msSpy = spy(new MessageServiceImpl());
+		willReturn(MessageStatus.CONNECTION_ERROR).given(msSpy).connect(INVALIDSERWER);
+		
+		MessageApp ma = new MessageApp(msSpy);
+		assertEquals(1, ma.sendMessage(INVALIDSERWER, VALIDRECEIPIENT, VALID_CONTENT));
+	}
+	
+	@Test
+	public void InvalidRecipientSpyTest() {
+		MessageService msSpy = spy(new MessageServiceImpl());
+		willReturn(MessageStatus.INVALID_RECEIPIENT).given(msSpy).sendMessage(eq(INVALIDRECEIPIENT), anyString());	
+		
+		MessageApp ma = new MessageApp(msSpy);
+		assertEquals(4, ma.sendMessage(VALIDSERWER, INVALIDRECEIPIENT, VALID_CONTENT));
+	}
+	
+	@Test
+	public void sendSuccesSpyTest() {
+		MessageService msSpy = spy(new MessageServiceImpl());
+		willReturn(MessageStatus.SEND).given(msSpy).sendMessage(eq(VALIDRECEIPIENT), eq(VALID_CONTENT));	
+		
+		MessageApp ma = new MessageApp(msSpy);
+		assertEquals(0, ma.sendMessage(VALIDSERWER, VALIDRECEIPIENT, VALID_CONTENT));
+	}
+	
+	
+	@Test
+	public void connectedTest () {	
+ 		assertEquals(0, ma.sendMessage(VALIDSERWER, VALIDRECEIPIENT, VALID_CONTENT));
+ 		verify(msMock,times(1)).sendMessage(anyString(), anyString());
+	}
+	@Test
+	public void InvalidRecipientTest(){
+		assertEquals(4, ma.sendMessage(VALIDSERWER, INVALIDRECEIPIENT, VALID_CONTENT));
+		verify(msMock).sendMessage(anyString(), anyString());	
+	}
+	@Test
+	public void InvalidSerwer() {
+		assertEquals(1, ma.sendMessage(INVALIDSERWER, VALIDRECEIPIENT, VALID_CONTENT));
+		verify(msMock, never()).sendMessage(anyString(), anyString());
+	}
+	@Test
+	public void InvalidContent () {
+		assertEquals(3, ma.sendMessage(VALIDSERWER, VALIDRECEIPIENT, INVALID_CONTENT));
+		verify(msMock).sendMessage(anyString(), anyString());
+	}
+	
 	
 }
